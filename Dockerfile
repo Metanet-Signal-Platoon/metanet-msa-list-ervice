@@ -1,38 +1,30 @@
 # 1단계: 빌드 단계
-FROM node:20-alpine AS builder
+FROM gradle:8.3-jdk17 AS builder
 
-# 작업 디렉토리 생성
+# 작업 디렉토리 설정
 WORKDIR /app
 
-# 빌드에 필요한 패키지 설치
-RUN apk add --no-cache python3 make g++
+# Gradle 캐시를 활용하기 위해 gradle 관련 파일 먼저 복사
+COPY gradle gradle
+COPY build.gradle settings.gradle ./
 
-# package.json, package-lock.json 복사 후 의존성 설치
-COPY package*.json ./
-RUN npm install  # <-- `--production` 제거
+# Gradle 의존성 미리 다운로드
+RUN gradle dependencies --no-daemon
 
-# 전체 소스 코드 복사
+# 전체 프로젝트 복사 후 빌드
 COPY . .
+RUN gradle build -x test --no-daemon
 
-# NestJS 애플리케이션 빌드
-RUN npm run build
-
-# 2단계: 실제 실행 이미지
-FROM node:20-alpine
+# 2단계: 실행 단계
+FROM eclipse-temurin:17-jdk-alpine
 
 WORKDIR /app
 
-# 빌드된 결과물만 복사
-COPY --from=builder /app/dist ./dist
-COPY package*.json ./
+# 빌드된 JAR 파일 복사
+COPY --from=builder /app/build/libs/*.jar app.jar
 
-# 프로덕션 의존성 설치
-RUN npm install --production
-
-# 환경변수 설정
-ENV NODE_ENV=production
-ENV PORT=8080
-
+# 실행 포트 설정
 EXPOSE 8080
 
-CMD ["npm", "run", "start:prod"]
+# 실행 명령
+CMD ["java", "-jar", "app.jar"]
