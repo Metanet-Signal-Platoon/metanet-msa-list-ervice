@@ -45,23 +45,36 @@ jobs:
       - name: Checkout ArgoCD Repository
         uses: actions/checkout@v3
         with:
-          repository: Metanet-Signal-Platoon/argo-test
+          repository: Metanet-Signal-Platoon/argo-metanet-msa-list-service
           token: ${{ secrets.GH_PAT }}
           fetch-depth: 0  # 전체 브랜치 가져오기
 
+      - name: Check File Path
+        run: ls -R
+
+      - name: Find Deployment File
+        run: |
+          FILE_PATH=$(find . -type f -name "deployment.yaml" | head -n 1)
+
+          if [ -z "$FILE_PATH" ]; then
+            echo "Error: deployment.yaml not found!"
+            exit 1
+          fi
+
+          echo "Found deployment file: $FILE_PATH"
+          echo "DEPLOYMENT_FILE=$FILE_PATH" >> $GITHUB_ENV
+
       - name: Update Image in Deployment File
         run: |
-          FILE="deployment.yaml"
-
-          if [ -f "$FILE" ]; then
-            echo "Updating image in $FILE"
-            sed -i "s|image: ykim73094/metanet-msa-list-service:.*|image: ykim73094/metanet-msa-list-service:${{ env.TAG }}|" "$FILE"
+          if [ -f "${{ env.DEPLOYMENT_FILE }}" ]; then
+            echo "Updating image in ${{ env.DEPLOYMENT_FILE }}"
+            sed -i "s|image: ykim73094/metanet-msa-list-service:.*|image: ykim73094/metanet-msa-list-service:${{ env.TAG }}|" "${{ env.DEPLOYMENT_FILE }}"
 
             # 변경 사항 확인
-            git diff "$FILE"
+            git diff "${{ env.DEPLOYMENT_FILE }}"
 
-            if git diff --quiet "$FILE"; then
-              echo "No changes detected in $FILE"
+            if git diff --quiet "${{ env.DEPLOYMENT_FILE }}"; then
+              echo "No changes detected in ${{ env.DEPLOYMENT_FILE }}"
               exit 0  # 변경 사항이 없으면 오류 없이 종료
             fi
           else
@@ -74,7 +87,7 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           
-          git add deployment.yaml
+          git add "${{ env.DEPLOYMENT_FILE }}"
 
           # 변경 사항이 있을 경우에만 commit & push 수행
           if git diff --staged --quiet; then
