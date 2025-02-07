@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Application Repository
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Prepare Image Tag
+        id: prepare-tag
+        run: |
+          TAG=$(date +%s)
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Generated TAG: $TAG"
+
+      - name: Build and Push Docker Image
+        id: build_and_push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ykim73094/metanet-msa-list-service:latest
+            ykim73094/metanet-msa-list-service:${{ env.TAG }}
+
+      - name: Checkout ArgoCD Repository
+        uses: actions/checkout@v3
+        with:
+          repository: Metanet-Signal-Platoon/argo-test
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0  # 전체 브랜치 가져오기
+
+      - name: Update Image in Deployment File
+        run: |
+          FILE="deployment.yaml"
+
+          if [ -f "$FILE" ]; then
+            echo "Updating image in $FILE"
+            sed -i "s|image: ykim73094/metanet-msa-list-service:.*|image: ykim73094/metanet-msa-list-service:${{ env.TAG }}|" "$FILE"
+
+            # 변경 사항 확인
+            git diff "$FILE"
+
+            if git diff --quiet "$FILE"; then
+              echo "No changes detected in $FILE"
+              exit 0  # 변경 사항이 없으면 오류 없이 종료
+            fi
+          else
+            echo "Error: deployment.yaml not found!"
+            exit 1
+          fi
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          
+          git add deployment.yaml
+
+          # 변경 사항이 있을 경우에만 commit & push 수행
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0  # 변경 사항이 없으면 정상 종료
+          else
+            git commit -m "Update image to ykim73094/metanet-msa-list-service:${{ env.TAG }}"
+            git push origin main
+          fi
