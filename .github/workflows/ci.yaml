@@ -45,7 +45,7 @@ jobs:
       - name: Checkout ArgoCD Repository
         uses: actions/checkout@v3
         with:
-          repository: Metanet-Signal-Platoon/argo-metanet-msa-list-service
+          repository: Metanet-Signal-Platoon/ArgoCD-metabank
           token: ${{ secrets.GH_PAT }}
           fetch-depth: 0  # 전체 브랜치 가져오기
 
@@ -54,7 +54,7 @@ jobs:
 
       - name: Find Deployment File
         run: |
-          FILE_PATH=$(find . -type f -name "deployment.yaml" | head -n 1)
+          FILE_PATH="metanet-msa-list-service/deployment.yaml"
 
           if [ -z "$FILE_PATH" ]; then
             echo "Error: deployment.yaml not found!"
