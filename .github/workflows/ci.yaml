@@ -54,7 +54,7 @@ jobs:
 
       - name: Find Deployment File
         run: |
-          FILE_PATH="metanet-msa-list-service/deployment.yaml"
+          FILE_PATH="argo-metanet-msa-list-service/deployment.yaml"
 
           if [ -z "$FILE_PATH" ]; then
             echo "Error: deployment.yaml not found!"
